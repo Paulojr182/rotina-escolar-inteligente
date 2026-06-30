@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,9 +8,6 @@ import { ScheduleTable } from "@/components/rotina/ScheduleTable";
 import {
   createEmptyForm,
   createRow,
-  loadForm,
-  saveForm,
-  clearForm,
   STATUS_META,
   type CategoryId,
   type RotinaForm,
@@ -26,9 +23,27 @@ import {
   User,
   Users,
   UserCheck,
+  LogOut,
 } from "lucide-react";
+import {
+  getCurrentUserFn,
+  getRotinaFn,
+  saveRotinaFn,
+  logoutFn,
+  SessionUser,
+} from "@/lib/server-functions";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    const user = await getCurrentUserFn();
+    if (!user) {
+      throw redirect({ to: "/login" });
+    }
+    if (user.perfil === "admin") {
+      throw redirect({ to: "/admin" });
+    }
+    return { user };
+  },
   head: () => ({
     meta: [
       { title: "Rotina de Estudos 2026 | Colégio Santa Catarina" },
@@ -48,14 +63,48 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [form, setForm] = useState<RotinaForm>(() => createEmptyForm());
-  const loaded = useRef(false);
+  const { user } = Route.useRouteContext() as { user: SessionUser };
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState<RotinaForm>(() => {
+    const empty = createEmptyForm();
+    empty.studentName = user.nome;
+    empty.classGroup = user.serie && user.turma ? `${user.serie} - ${user.turma}` : "";
+    empty.week = "10 a 16/03"; // Default week
+    return empty;
+  });
+
+  const [loading, setLoading] = useState(true);
+
+  // Load routine from SQLite
+  const loadDbRoutine = async (week: string) => {
+    setLoading(true);
+    try {
+      const res = await getRotinaFn({ data: { usuarioId: user.id, semana: week } });
+      if (res) {
+        setForm({
+          ...res,
+          studentName: user.nome,
+          classGroup: user.serie && user.turma ? `${user.serie} - ${user.turma}` : "",
+        } as RotinaForm);
+      } else {
+        // Fallback to empty form for this week
+        const empty = createEmptyForm();
+        empty.studentName = user.nome;
+        empty.classGroup = user.serie && user.turma ? `${user.serie} - ${user.turma}` : "";
+        empty.week = week;
+        setForm(empty);
+      }
+    } catch (err: any) {
+      toast.error("Erro ao carregar rotina do servidor: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const saved = loadForm();
-    if (saved) setForm(saved);
-    loaded.current = true;
-  }, []);
+    loadDbRoutine(form.week);
+  }, [form.week]);
 
   const update = (patch: Partial<RotinaForm>) =>
     setForm((f) => ({ ...f, ...patch }));
@@ -76,23 +125,40 @@ function Index() {
   const handleChangeCell = (
     rowId: string,
     day: string,
-    field: "text" | "category",
-    value: string | CategoryId | null,
+    updates: Record<string, any>,
   ) =>
-    setForm((f) => ({
-      ...f,
-      rows: f.rows.map((r) =>
+    setForm((f) => {
+      const updatedRows = f.rows.map((r) =>
         r.id === rowId
           ? {
               ...r,
               days: {
                 ...r.days,
-                [day]: { ...r.days[day as keyof typeof r.days], [field]: value },
+                [day]: {
+                  ...r.days[day as keyof typeof r.days],
+                  ...updates,
+                },
               },
             }
-          : r,
-      ),
-    }));
+          : r
+      );
+      const updatedForm = { ...f, rows: updatedRows };
+
+      const hasAutoSaveField = "realizado" in updates || "observacao_lida" in updates;
+      if (hasAutoSaveField) {
+        saveRotinaFn({
+          data: {
+            usuarioId: user.id,
+            semana: f.week,
+            form: updatedForm,
+          },
+        }).catch((err) => {
+          console.error("Erro no auto-salvamento da rotina:", err);
+        });
+      }
+
+      return updatedForm;
+    });
 
   const handleAddRow = () =>
     setForm((f) => ({ ...f, rows: [...f.rows, createRow()] }));
@@ -100,48 +166,50 @@ function Index() {
   const handleRemoveRow = (rowId: string) =>
     setForm((f) => ({ ...f, rows: f.rows.filter((r) => r.id !== rowId) }));
 
-  const persist = (next: RotinaForm) => {
-    const withTime = { ...next, updatedAt: new Date().toISOString() };
-    saveForm(withTime);
-    setForm(withTime);
-    return withTime;
-  };
-
-  const handleSaveDraft = () => {
-    persist({ ...form, status: form.status === "sent" ? "sent" : "draft" });
-    toast.success("Rascunho salvo neste navegador.");
-  };
-
-  const validate = () => {
-    const missing: string[] = [];
-    if (!form.studentName.trim()) missing.push("Nome do aluno");
-    if (!form.classGroup.trim()) missing.push("Série / Turma");
-    if (!form.week.trim()) missing.push("Semana referente");
-    return missing;
-  };
-
-  const handleSend = () => {
-    const missing = validate();
-    if (missing.length) {
-      toast.error(`Preencha antes de enviar: ${missing.join(", ")}.`);
-      return;
+  const handleSave = async () => {
+    try {
+      const updatedForm = {
+        ...form,
+        status: "sent" as const,
+        sentAt: form.sentAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await saveRotinaFn({
+        data: {
+          usuarioId: user.id,
+          semana: form.week,
+          form: updatedForm,
+        },
+      });
+      setForm(updatedForm);
+      toast.success("Rotina salva com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar rotina: " + err.message);
     }
-    persist({ ...form, status: "sent", sentAt: new Date().toISOString() });
-    toast.success(
-      "Ficha marcada como enviada. Gere o PDF e envie para a orientadora.",
-    );
-    setTimeout(() => window.print(), 400);
   };
 
   const handleClear = () => {
     if (!window.confirm("Tem certeza que deseja limpar todo o formulário?"))
       return;
-    clearForm();
-    setForm(createEmptyForm());
-    toast.success("Formulário limpo.");
+    const cleared = createEmptyForm();
+    cleared.studentName = user.nome;
+    cleared.classGroup = user.serie && user.turma ? `${user.serie} - ${user.turma}` : "";
+    cleared.week = form.week;
+    setForm(cleared);
+    toast.success("Formulário limpo localmente. Lembre-se de salvar.");
   };
 
   const handlePrint = () => window.print();
+
+  const handleLogout = async () => {
+    try {
+      await logoutFn();
+      toast.success("Logout efetuado.");
+      navigate({ to: "/login" });
+    } catch {
+      toast.error("Erro ao sair.");
+    }
+  };
 
   const status = STATUS_META[form.status];
 
@@ -150,6 +218,20 @@ function Index() {
       <Toaster richColors position="top-center" />
 
       <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-10">
+        {/* Top Header Controls (No-print) */}
+        <div className="no-print mb-4 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Logado como: <strong>{user.nome}</strong> ({user.login_office365})
+          </span>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-destructive border border-destructive/20 hover:bg-destructive/10 rounded-lg transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sair
+          </button>
+        </div>
+
         {/* Header */}
         <header className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] print-shadow-none print-break-inside-avoid">
           <div className="flex flex-col items-center gap-4 bg-brand px-5 py-6 text-brand-foreground sm:flex-row sm:gap-5 sm:px-8">
@@ -181,13 +263,14 @@ function Index() {
           </div>
 
           {/* Student fields */}
-          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-8 lg:grid-cols-3">
             <Field
               icon={<User className="h-4 w-4" />}
               label="Nome do aluno"
               value={form.studentName}
               onChange={(v) => update({ studentName: v })}
               placeholder="Nome completo"
+              readOnly
             />
             <Field
               icon={<Users className="h-4 w-4" />}
@@ -195,6 +278,7 @@ function Index() {
               value={form.classGroup}
               onChange={(v) => update({ classGroup: v })}
               placeholder="Ex.: 3º ano A"
+              readOnly
             />
             <Field
               icon={<CalendarDays className="h-4 w-4" />}
@@ -203,89 +287,86 @@ function Index() {
               onChange={(v) => update({ week: v })}
               placeholder="Ex.: 10 a 16/03"
             />
-            <Field
-              icon={<UserCheck className="h-4 w-4" />}
-              label="Orientadora responsável"
-              value={form.advisor}
-              onChange={(v) => update({ advisor: v })}
-              placeholder="Nome da orientadora"
-            />
           </div>
         </header>
 
-        {/* Legend */}
-        <Section title="Legenda das categorias">
-          <Legend />
-        </Section>
-
-        {/* Weekly schedule */}
-        <Section title="Rotina semanal" subtitle="Preencha as atividades de cada dia e escolha uma categoria.">
-          <ScheduleTable
-            rows={form.rows}
-            onChangeTime={handleChangeTime}
-            onChangeCell={handleChangeCell}
-            onAddRow={handleAddRow}
-            onRemoveRow={handleRemoveRow}
-          />
-        </Section>
-
-        {/* Focus planning */}
-        <Section title="Planejamento de Foco da Semana">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TextareaField
-              label="Matérias que precisam de mais atenção"
-              value={form.focus.attention}
-              onChange={(v) => updateFocus("attention", v)}
-              placeholder="Liste as matérias que exigem mais dedicação..."
-            />
-            <TextareaField
-              label="Avaliações previstas"
-              value={form.focus.evaluations}
-              onChange={(v) => updateFocus("evaluations", v)}
-              placeholder="Provas, testes, simulados ou trabalhos com data..."
-            />
-            <TextareaField
-              label="Metas da Semana"
-              value={form.focus.goals}
-              onChange={(v) => updateFocus("goals", v)}
-              placeholder="O que você quer alcançar nesta semana..."
-            />
-            <TextareaField
-              label="Observações / Anotações do aluno"
-              value={form.focus.notes}
-              onChange={(v) => updateFocus("notes", v)}
-              placeholder="Anotações livres..."
-            />
+        {loading ? (
+          <div className="mt-12 flex justify-center items-center">
+            <p className="text-sm text-muted-foreground animate-pulse">Carregando rotina...</p>
           </div>
-        </Section>
+        ) : (
+          <>
+            {/* Legend */}
+            <Section title="Legenda das categorias">
+              <Legend />
+            </Section>
 
-        {/* Actions */}
-        <div className="no-print sticky bottom-3 z-20 mt-6 flex flex-wrap justify-center gap-2 rounded-2xl border border-border bg-card/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <Button variant="outline" onClick={handleSaveDraft}>
-            <Save className="h-4 w-4" />
-            Salvar rascunho
-          </Button>
-          <Button variant="brand" onClick={handleSend}>
-            <Send className="h-4 w-4" />
-            Enviar para orientadora
-          </Button>
-          <Button variant="success" onClick={handlePrint}>
-            <FileDown className="h-4 w-4" />
-            Gerar PDF
-          </Button>
-          <Button variant="secondary" onClick={handlePrint}>
-            <Printer className="h-4 w-4" />
-            Imprimir
-          </Button>
-          <Button variant="destructive" onClick={handleClear}>
-            <Eraser className="h-4 w-4" />
-            Limpar formulário
-          </Button>
-        </div>
+            {/* Weekly schedule */}
+            <Section title="Rotina semanal" subtitle="Preencha as atividades de cada dia e escolha uma categoria.">
+              <ScheduleTable
+                rows={form.rows}
+                onChangeTime={handleChangeTime}
+                onChangeCell={handleChangeCell}
+                onAddRow={handleAddRow}
+                onRemoveRow={handleRemoveRow}
+                showRealizado={true}
+              />
+            </Section>
+
+            {/* Focus planning */}
+            <Section title="Planejamento de Foco da Semana">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <TextareaField
+                  label="Matérias que precisam de mais atenção"
+                  value={form.focus.attention}
+                  onChange={(v) => updateFocus("attention", v)}
+                  placeholder="Liste as matérias que exigem mais dedicação..."
+                />
+                <TextareaField
+                  label="Avaliações previstas"
+                  value={form.focus.evaluations}
+                  onChange={(v) => updateFocus("evaluations", v)}
+                  placeholder="Provas, testes, simulados ou trabalhos com data..."
+                />
+                <TextareaField
+                  label="Metas da Semana"
+                  value={form.focus.goals}
+                  onChange={(v) => updateFocus("goals", v)}
+                  placeholder="O que você quer alcançar nesta semana..."
+                />
+                <TextareaField
+                  label="Observações / Anotações do aluno"
+                  value={form.focus.notes}
+                  onChange={(v) => updateFocus("notes", v)}
+                  placeholder="Anotações livres..."
+                />
+              </div>
+            </Section>
+
+            {/* Actions */}
+            <div className="no-print sticky bottom-3 z-20 mt-6 flex flex-wrap justify-center gap-2 rounded-2xl border border-border bg-card/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
+              <Button variant="brand" onClick={handleSave}>
+                <Save className="h-4 w-4" />
+                Salvar Rotina
+              </Button>
+              <Button variant="success" onClick={handlePrint}>
+                <FileDown className="h-4 w-4" />
+                Gerar PDF
+              </Button>
+              <Button variant="secondary" onClick={handlePrint}>
+                <Printer className="h-4 w-4" />
+                Imprimir
+              </Button>
+              <Button variant="destructive" onClick={handleClear}>
+                <Eraser className="h-4 w-4" />
+                Limpar formulário
+              </Button>
+            </div>
+          </>
+        )}
 
         <p className="no-print mt-4 text-center text-xs text-muted-foreground">
-          As informações ficam salvas neste navegador. Use “Gerar PDF” para
-          enviar a ficha à orientadora.
+          Sua rotina fica salva diretamente no banco de dados do colégio.
         </p>
       </div>
     </div>
@@ -322,12 +403,14 @@ function Field({
   value,
   onChange,
   placeholder,
+  readOnly = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   return (
     <label className="block">
@@ -337,9 +420,12 @@ function Field({
       </span>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => !readOnly && onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+        readOnly={readOnly}
+        className={`w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none ${
+          readOnly ? "opacity-75 cursor-not-allowed bg-muted/20" : "focus:ring-2 focus:ring-ring/40"
+        }`}
       />
     </label>
   );

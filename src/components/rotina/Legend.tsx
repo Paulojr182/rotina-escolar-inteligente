@@ -8,7 +8,11 @@ export function Legend() {
         return (
           <div
             key={cat.id}
-            className={`flex items-start gap-2 rounded-xl border border-${cat.color}/20 bg-${cat.color}/10 p-2.5`}
+            draggable="true"
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/plain", cat.id);
+            }}
+            className={`flex items-start gap-2 rounded-xl border border-${cat.color}/20 bg-${cat.color}/10 p-2.5 cursor-grab active:cursor-grabbing hover:bg-${cat.color}/20 transition-colors`}
           >
             <span
               className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-${cat.color} text-white`}

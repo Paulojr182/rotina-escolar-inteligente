@@ -1,3 +1,4 @@
+import React from "react";
 import {
   BookOpen,
   ClipboardList,
@@ -5,8 +6,19 @@ import {
   GraduationCap,
   Coffee,
   Target,
-  type LucideIcon,
+  School,
 } from "lucide-react";
+
+import emAulaRegularImg from "@/assets/em-aula-regular.png";
+
+export const CatarinaIcon: any = (props: any) => (
+  <img
+    src={emAulaRegularImg}
+    alt="Em Aula Regular"
+    className={props.className}
+    style={{ ...props.style, objectFit: "contain" }}
+  />
+);
 
 export type CategoryId =
   | "priority"
@@ -14,13 +26,14 @@ export type CategoryId =
   | "review"
   | "exam"
   | "rest"
-  | "college";
+  | "college"
+  | "class";
 
 export interface CategoryMeta {
   id: CategoryId;
   label: string;
   description: string;
-  icon: LucideIcon;
+  icon: any;
   /** Tailwind color token name (matches --color-cat-*) */
   color: string;
 }
@@ -68,6 +81,13 @@ export const CATEGORIES: CategoryMeta[] = [
     icon: Target,
     color: "cat-college",
   },
+  {
+    id: "class",
+    label: "Em Aula Regular",
+    description: "Aulas da grade curricular regular",
+    icon: School,
+    color: "cat-class",
+  },
 ];
 
 export const CATEGORY_MAP: Record<CategoryId, CategoryMeta> = CATEGORIES.reduce(
@@ -93,6 +113,9 @@ export type DayKey = (typeof WEEK_DAYS)[number]["key"];
 export interface DayCell {
   text: string;
   category: CategoryId | null;
+  realizado?: boolean;
+  data_realizacao?: string | null;
+  observacao_lida?: boolean;
 }
 
 export interface ScheduleRow {
@@ -134,7 +157,13 @@ export interface RotinaForm {
 function emptyDays(): Record<DayKey, DayCell> {
   return WEEK_DAYS.reduce(
     (acc, d) => {
-      acc[d.key] = { text: "", category: null };
+      acc[d.key] = {
+        text: "",
+        category: null,
+        realizado: false,
+        data_realizacao: null,
+        observacao_lida: false,
+      };
       return acc;
     },
     {} as Record<DayKey, DayCell>,
@@ -159,11 +188,15 @@ export function createEmptyForm(): RotinaForm {
     week: "",
     advisor: "",
     rows: [
-      createRow("07:00", "08:00"),
-      createRow("08:00", "09:00"),
-      createRow("09:00", "10:00"),
-      createRow("14:00", "15:00"),
-      createRow("19:00", "20:00"),
+      createRow("07:00", "08:40"),
+      createRow("08:40", "09:50"),
+      createRow("09:50", "12:20"),
+      createRow("12:20", "14:00"),
+      createRow("14:00", "15:30"),
+      createRow("15:30", "16:30"),
+      createRow("16:30", "18:00"),
+      createRow("18:00", "19:30"),
+      createRow("19:30", "21:00"),
     ],
     focus: { attention: "", evaluations: "", goals: "", notes: "" },
     status: "draft",

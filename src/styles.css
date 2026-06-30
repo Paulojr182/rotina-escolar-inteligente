@@ -2,8 +2,8 @@
 @source "../src";
 @import "tw-animate-css";
 
-@source inline("{bg,text,border,ring}-cat-{priority,task,review,exam,rest,college}");
-@source inline("bg-cat-{priority,task,review,exam,rest,college}/{10,15,20}");
+@source inline("{bg,text,border,ring}-cat-{priority,task,review,exam,rest,college,class}");
+@source inline("bg-cat-{priority,task,review,exam,rest,college,class}/{10,15,20}");
 @source inline("text-{primary,success,destructive,muted-foreground} bg-{primary,success,destructive,muted-foreground}/10");
 
 @custom-variant dark (&:is(.dark *));
@@ -75,6 +75,7 @@
   --color-cat-exam: var(--cat-exam);
   --color-cat-rest: var(--cat-rest);
   --color-cat-college: var(--cat-college);
+  --color-cat-class: var(--cat-class);
 
   --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
@@ -126,6 +127,7 @@
   --cat-exam: oklch(0.55 0.17 300);
   --cat-rest: oklch(0.62 0.02 256);
   --cat-college: oklch(0.58 0.2 18);
+  --cat-class: oklch(0.55 0.14 185);
 
   --shadow-card: 0 1px 3px oklch(0.45 0.13 252 / 0.08), 0 8px 24px oklch(0.45 0.13 252 / 0.06);
 }

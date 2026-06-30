@@ -10,11 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminImportarRouteImport } from './routes/admin/importar'
+import { Route as AdminConfiguracaoRouteImport } from './routes/admin/configuracao'
+import { Route as AdminAlunosRouteImport } from './routes/admin/alunos'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,31 +32,93 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminImportarRoute = AdminImportarRouteImport.update({
+  id: '/admin/importar',
+  path: '/admin/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminConfiguracaoRoute = AdminConfiguracaoRouteImport.update({
+  id: '/admin/configuracao',
+  path: '/admin/configuracao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAlunosRoute = AdminAlunosRouteImport.update({
+  id: '/admin/alunos',
+  path: '/admin/alunos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/alunos': typeof AdminAlunosRoute
+  '/admin/configuracao': typeof AdminConfiguracaoRoute
+  '/admin/importar': typeof AdminImportarRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/alunos': typeof AdminAlunosRoute
+  '/admin/configuracao': typeof AdminConfiguracaoRoute
+  '/admin/importar': typeof AdminImportarRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/alunos': typeof AdminAlunosRoute
+  '/admin/configuracao': typeof AdminConfiguracaoRoute
+  '/admin/importar': typeof AdminImportarRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sitemap.xml'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/sitemap.xml'
+    | '/admin/alunos'
+    | '/admin/configuracao'
+    | '/admin/importar'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sitemap.xml'
-  id: '__root__' | '/' | '/sitemap.xml'
+  to:
+    | '/'
+    | '/login'
+    | '/sitemap.xml'
+    | '/admin/alunos'
+    | '/admin/configuracao'
+    | '/admin/importar'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/sitemap.xml'
+    | '/admin/alunos'
+    | '/admin/configuracao'
+    | '/admin/importar'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  AdminAlunosRoute: typeof AdminAlunosRoute
+  AdminConfiguracaoRoute: typeof AdminConfiguracaoRoute
+  AdminImportarRoute: typeof AdminImportarRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +130,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,13 +144,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/importar': {
+      id: '/admin/importar'
+      path: '/admin/importar'
+      fullPath: '/admin/importar'
+      preLoaderRoute: typeof AdminImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/configuracao': {
+      id: '/admin/configuracao'
+      path: '/admin/configuracao'
+      fullPath: '/admin/configuracao'
+      preLoaderRoute: typeof AdminConfiguracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/alunos': {
+      id: '/admin/alunos'
+      path: '/admin/alunos'
+      fullPath: '/admin/alunos'
+      preLoaderRoute: typeof AdminAlunosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  AdminAlunosRoute: AdminAlunosRoute,
+  AdminConfiguracaoRoute: AdminConfiguracaoRoute,
+  AdminImportarRoute: AdminImportarRoute,
+  AdminIndexRoute: AdminIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

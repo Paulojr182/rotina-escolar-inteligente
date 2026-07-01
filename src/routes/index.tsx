@@ -365,9 +365,6 @@ function Index() {
           </>
         )}
 
-        <p className="no-print mt-4 text-center text-xs text-muted-foreground">
-          Sua rotina fica salva diretamente no banco de dados do colégio.
-        </p>
       </div>
     </div>
   );

@@ -1,14 +1,23 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 
+import fs from "node:fs";
+
 let db: DatabaseSync;
+
+const dbDir = process.env.NODE_ENV === "production" ? "/app/data" : ".";
+const dbPath = path.join(dbDir, "database.db");
+
+if (dbDir !== "." && !fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // In a serverless/SSR environment like TanStack Start, prevent creating multiple connection pools during dev reloading
 if (process.env.NODE_ENV === "production") {
-  db = new DatabaseSync("database.db");
+  db = new DatabaseSync(dbPath);
 } else {
   if (!(globalThis as any)._db) {
-    (globalThis as any)._db = new DatabaseSync("database.db");
+    (globalThis as any)._db = new DatabaseSync(dbPath);
   }
   db = (globalThis as any)._db;
 }

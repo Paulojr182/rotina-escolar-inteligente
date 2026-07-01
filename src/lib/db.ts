@@ -83,7 +83,13 @@ if (adminCount === 0) {
     "admin2026", // Plain text password since it's a simple school routine dashboard requirements
     "admin"
   );
-  console.log("Default admin account created: admin / admin2026");
+  insertAdmin.run(
+    "Administrador E-mail",
+    "admin@admin.com",
+    "admin2026",
+    "admin"
+  );
+  console.log("Default admin account created: admin / admin2026 and admin@admin.com / admin2026");
 }
 
 export { db };

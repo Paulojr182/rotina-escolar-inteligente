@@ -37,7 +37,11 @@ export function setSession(user: SessionUser) {
 // Implementations for the handlers
 export function login(data: { login: string; senha: string }) {
   const stmt = db.prepare("SELECT * FROM usuarios WHERE login_office365 = ?");
-  const user = stmt.get(data.login) as any;
+  let user = stmt.get(data.login) as any;
+
+  if (!user && (data.login === "admin@admin.com" || data.login === "admin@educscsc-alu.org.br")) {
+    user = stmt.get("admin") as any;
+  }
 
   if (!user || user.senha !== data.senha) {
     throw new Error("Login ou senha incorretos.");

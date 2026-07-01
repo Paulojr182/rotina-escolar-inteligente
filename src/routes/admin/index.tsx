@@ -95,7 +95,14 @@ function AdminDashboard() {
 
   // Extract unique series and classes for filter dropdowns
   const uniqueSeries = Array.from(new Set(alunos.map((a) => a.serie).filter(Boolean)));
-  const uniqueTurmas = Array.from(new Set(alunos.map((a) => a.turma).filter(Boolean)));
+  const uniqueTurmas = Array.from(
+    new Set(
+      alunos
+        .filter((a) => !serie || a.serie === serie)
+        .map((a) => a.turma)
+        .filter(Boolean)
+    )
+  );
 
   const handleExportExcel = () => {
     if (!alunos.length) {
@@ -232,7 +239,10 @@ function AdminDashboard() {
               </span>
               <select
                 value={serie}
-                onChange={(e) => setSerie(e.target.value)}
+                onChange={(e) => {
+                  setSerie(e.target.value);
+                  setTurma("");
+                }}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
               >
                 <option value="">Todas as séries</option>
